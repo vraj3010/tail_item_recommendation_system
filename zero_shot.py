@@ -5,7 +5,7 @@ class Generator(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(Generator, self).__init__()
         self.model = nn.Sequential(
-            nn.Linear(input_dim, 128),
+            nn.Linear(128, 128),
             nn.ReLU(),
             nn.Linear(128, output_dim)
         )
@@ -22,7 +22,7 @@ class Discriminator(nn.Module):
     def __init__(self, input_dim):
         super(Discriminator, self).__init__()
         self.model = nn.Sequential(
-            nn.Linear(input_dim, 128),
+            nn.Linear(128, 128),
             nn.ReLU(),
             nn.Linear(128, 1)
         )
@@ -33,22 +33,25 @@ class Discriminator(nn.Module):
 
 def synthetic_representation(generator, discriminator, a_same,i_head,i_tail,optimizer_G, optimizer_D,N_D):
 
-    for _ in range(N_D):
-        i_G = generator(a_same, i_tail)
-        score_G = discriminator(torch.cat([a_same, i_G], dim=1))
-        score_head = discriminator(torch.cat([a_same, i_head], dim=1))
-        loss_D = -score_G.mean() + score_head.mean()
 
-        # Update Discriminator
-        optimizer_D.zero_grad()
-        loss_D.backward()
-        optimizer_D.step()
+    i_G = generator(a_same, i_tail)
+
+    score_G = discriminator(torch.cat([a_same, i_G], dim=1))
+    score_head = discriminator(torch.cat([a_same, i_head], dim=1))
+    loss_D = -score_G.mean() + score_head.mean()
+
+    # Update Discriminator
+    optimizer_D.zero_grad()
+    loss_D.backward(retain_graph=True)
+    optimizer_D.step()
 
     # Compute Generator loss (Eq 11)
-    loss_G = -discriminator(torch.cat([a_same, generator(a_same, i_tail)], dim=1)).mean()
+    loss_G = -discriminator(torch.cat([a_same,i_G], dim=1)).mean()
 
     # Update Generator
     optimizer_G.zero_grad()
     loss_G.backward()
     optimizer_G.step()
+
+    return loss_G,loss_D
 

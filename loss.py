@@ -13,28 +13,7 @@ def head_loss(emb1, emb2, tau):
     return loss
 
 
-def generator_loss(D, G, a_same, tail_items):
-    """
-    Equation (11): Generator loss function.
-    """
-    D_G = D(G(a_same, tail_items))
-    loss = -torch.mean(D_G)
-    return loss
 
 
-def discriminator_loss(D, a_same, generated_tail, generated_head):
-    """
-    Equation (12): Discriminator loss function.
-    """
-    D_generated_tail = D(a_same, generated_tail)
-    D_generated_head = D(a_same, generated_head)
-    loss = torch.mean(D_generated_tail) - torch.mean(D_generated_head)
-    return loss
 
 
-def main_loss(predictions_pos, predictions_neg):
-    """
-    Equation (14): Main loss function (preference score).
-    """
-    loss = -torch.sum(torch.log(torch.sigmoid(predictions_pos - predictions_neg)))
-    return loss

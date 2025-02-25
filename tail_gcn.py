@@ -41,9 +41,7 @@ def add_nodes(graph,head_item, batch_items, num_additional_nodes=3):
 
 
 def add_edges(graph,tail_items, probability_std=1.0):
-    """
-    Augments the graph by adding new edges using a Gaussian probability distribution.
-    """
+
     edge_index = graph.edge_index.clone()
     num_nodes = graph.num_nodes
 
@@ -86,18 +84,12 @@ def add_edges(graph,tail_items, probability_std=1.0):
 
 
 def tail_items_self_supervised_training(model, optimizer, int_edges, head_items, tail_items, H=32, tau=0.1):
-    """
-    Implements self-supervised training for long-tail items using AN/AE methods.
-    """
+
     total_loss_tail = 0
-    k=1
     random.shuffle(tail_items)
     batch_size = len(tail_items) // H
     for batch in range(H):
 
-        k-=1
-        if k<0:
-            break
         start_idx = batch * batch_size
         end_idx = len(tail_items) if batch == H - 1 else (batch + 1) * batch_size
         batch_items = tail_items[start_idx:end_idx]
@@ -105,7 +97,6 @@ def tail_items_self_supervised_training(model, optimizer, int_edges, head_items,
         graph = Data(edge_index=int_edges, num_nodes=max(int_edges.flatten()) + 1)
         graph2 = Data(edge_index=int_edges, num_nodes=max(int_edges.flatten()) + 1)
 
-    # Apply data augmentation
         graph = add_nodes(graph, head_items, batch_items)
         graph2 = add_edges(graph2,batch_items)
         model.train()

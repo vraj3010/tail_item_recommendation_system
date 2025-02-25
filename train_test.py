@@ -10,7 +10,7 @@ def train_test_split_per_user(indices, user_ids, test_size=0.2):
     #     random.seed(seed)
 
     user_to_indices = defaultdict(list)
-    # print(user_to_indices)
+    print(user_to_indices)
 
     for idx, user_id in zip(indices, user_ids):
         user_to_indices[user_id.item()].append(idx.item())
