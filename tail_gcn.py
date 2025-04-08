@@ -53,44 +53,6 @@ def add_nodes(graph, head_item, batch_items, num_additional_nodes=3):
 
     return Data(edge_index=edge_index, num_nodes=graph.num_nodes).to(device)
 
-def add_nodest(graph, head_item, batch_items, num_additional_nodes=3):
-
-    device = graph.edge_index.device  # Use existing graph device
-    edge_index = graph.edge_index.clone()  # Clone to avoid modifying the original graph
-    num_nodes = graph.num_nodes
-    new_edges = []
-
-    # Convert edge_index to COO format
-    users, items = edge_index[0], edge_index[1]
-
-    for tail_item in batch_items:
-        with torch.no_grad():  # No gradient needed
-            # Find head items with max common interactions using efficient set operations
-            head_interactions = (items.unsqueeze(0) == head_item.unsqueeze(1)).float()  # Shape: (num_head, num_edges)
-            tail_interactions = (items == tail_item).float().unsqueeze(0)  # Shape: (1, num_edges)
-            common_counts = torch.mm(head_interactions, tail_interactions.T).squeeze(1)  # Shape: (num_head,)
-
-        # Find most similar head item
-        max_idx = torch.argmax(common_counts)
-        similar_head_item = head_item[max_idx]
-
-        # Select users who interacted with the similar head item
-        head_users = users[items == similar_head_item]
-
-        # Randomly select a subset of interactions
-        if len(head_users) > num_additional_nodes:
-            sampled_users = head_users[torch.randperm(len(head_users))[:num_additional_nodes]]
-        else:
-            sampled_users = head_users
-
-        new_edges.append(torch.stack([sampled_users,torch.full_like(sampled_users, tail_item)], dim=0))
-
-    if new_edges:
-        new_edges = torch.cat(new_edges, dim=1)  # Combine all new edges
-        edge_index = torch.cat([edge_index, new_edges], dim=1)
-
-    return Data(edge_index=edge_index, num_nodes=num_nodes).to(device)
-
 def add_edges(graph, tail_items):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     edge_index = graph.edge_index.clone().to(device)
