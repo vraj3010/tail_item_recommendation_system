@@ -4,8 +4,6 @@ from loss import *
 from torch_geometric.data import Data
 import random
 
-
-#deepseek version
 def add_nodes(graph, head_item, batch_items, num_additional_nodes=3):
     device = graph.edge_index.device
     edge_index = graph.edge_index.clone()  # Shape: [2, num_edges]
