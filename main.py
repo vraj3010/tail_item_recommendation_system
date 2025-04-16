@@ -25,14 +25,18 @@ ratings['movieId'] = movie_encoder.fit_transform(ratings['movieId'])
 
 neg_samples=get_negative_items(ratings)
 # negative_items = get_negative_items(ratings)
+# print(len(neg_samples[0]))
 
 interaction_counts = ratings['movieId'].value_counts().to_dict()
 
 # Separate Head and Tail Items
+## high alert changed 0 from 15
 head_items, tail_items = separate_head_tail_items(interaction_counts, head_threshold=15)
-
 num_users = ratings['userId'].nunique()
 num_movies = ratings['movieId'].nunique()
+
+# for user in range(num_users):
+#     print(len(neg_samples[user]))
 head_items = torch.tensor([i + num_users for i in head_items], dtype=torch.long, device=device)
 tail_items = torch.tensor([i + num_users for i in tail_items], dtype=torch.long, device=device)
 
@@ -72,9 +76,8 @@ learning_rate = 0.001
 optimizer_G = optim.Adam(generator.parameters(), lr=learning_rate)
 optimizer_D = optim.Adam(discriminator.parameters(), lr=learning_rate)
 N_D = 5
-# ndcg_calculation_2(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
-# ndcg_calculation_head(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
-# ndcg_calculation_tail(model, test_set, neg_samples, num_users,int_edges,tail_items,k=2)
+ndcg_calculation_2(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
+
 
 print("Training started")
 for epoch in range(epochs):
@@ -151,22 +154,7 @@ for epoch in range(epochs):
 
         # print(f"Batch {t // T + 1}: Loss Main = {loss_main.item()}")
 
-    ndcg_calculation_2(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
-    ndcg_calculation_head(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
-    ndcg_calculation_tail(model, test_set, neg_samples, num_users,int_edges,tail_items,k=2)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+ndcg_calculation_2(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
+ndcg_calculation_head(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
+ndcg_calculation_tail(model, test_set, neg_samples, num_users,int_edges,tail_items,k=2)

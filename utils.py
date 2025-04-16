@@ -55,16 +55,20 @@ def ndcg_calculation_2(model, test_set, neg_samples,num_users,int_edges,head_ite
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    graph = Data(edge_index=int_edges, num_nodes=int_edges.max().item() + 1).to(device)
-    with torch.no_grad():
-        initial_emb = model(graph)
-        user_embeddings = initial_emb[:num_users,:]
-        item_embeddings = initial_emb[num_users:,:]
+    # graph = Data(edge_index=int_edges, num_nodes=int_edges.max().item() + 1).to(device)
+    # with torch.no_grad():
+    #     initial_emb = model(graph)
+    #     user_embeddings = initial_emb[:num_users,:]
+    #     item_embeddings = initial_emb[num_users:,:]
 
+    user_embeddings=model.user_embedding.weight
+    item_embeddings=model.item_embedding.weight
     total_ndcg = 0
     count = 0
 
     for user_id, pos_items in test_set.items():
+
+        # print(len(pos_items))
 
         if not pos_items:
             continue
@@ -73,7 +77,8 @@ def ndcg_calculation_2(model, test_set, neg_samples,num_users,int_edges,head_ite
 
 
         neg_items = random.sample(neg_samples[user_id], h)
-
+        # if (user_id == 0):
+        #     print(user_id,len(neg_samples[user_id]))
         if len(neg_items)*2<k:
             continue
         test_items = [item-num_users for item, _ in pos_items] + neg_items
@@ -93,7 +98,11 @@ def ndcg_calculation_2(model, test_set, neg_samples,num_users,int_edges,head_ite
 
 
         sorted_indices = torch.argsort(scores, descending=True)
-
+        # if user_id==0:
+        #     print(pos_items)
+        #     print(test_items)
+        #     print(scores)
+        #     print(sorted_indices)
         # print("Test Items Length:", len(test_items))
         # print("Sorted Indices:", sorted_indices.tolist())
         # print("Test Items:", test_items)
