@@ -30,7 +30,7 @@ neg_samples=get_negative_items(ratings)
 interaction_counts = ratings['movieId'].value_counts().to_dict()
 
 # Separate Head and Tail Items
-head_items, tail_items = separate_head_tail_items(interaction_counts, head_threshold=0)
+head_items, tail_items = separate_head_tail_items(interaction_counts, head_threshold=15)
 print(len(head_items))
 num_users = ratings['userId'].nunique()
 num_movies = ratings['movieId'].nunique()
@@ -95,48 +95,25 @@ for epoch in iterator:
 
     print(f"Epoch [{epoch + 1}/{epochs}], Loss (Head): {total_loss_head:.4f}")
 
-    # ndcg_calculation_3(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-    # graph = Data(edge_index=int_edges, num_nodes=int_edges.max().item() + 1).to(device)
-    # with torch.no_grad():
-    # user_embeddings = model.user_embedding.weight
-    # item_embeddings = model.item_embedding.weight
-    # all_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
-    # i_head2 = all_embeddings[head_items]
-    # repeat_factor = (len(tail_items) + len(head_items) - 1) // len(head_items)
-    # i_head = i_head2.repeat(repeat_factor, 1)[:len(tail_items)]  # Repeat and truncate
-    #
-    #
-    # total_loss_tail = tail_items_self_supervised_training(
-    #     model, optimizer, int_edges, head_items, tail_items, H=128, tau=0.1
-    # )
-    #
-    #
-    #
-    # print(f"Epoch [{epoch + 1}/{epochs}], Loss (Tail): {total_loss_tail:.4f}")
-    #
-    # user_embeddings = model.user_embedding.weight
-    # item_embeddings = model.item_embedding.weight
-    # all_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
-    # i_tail = all_embeddings[tail_items]
 
-    # # Synthetic Representation
-    # interaction_matrix=construct_interaction_matrix(int_edges,head_items,tail_items,num_users,num_movies)
-    # graph=construct_interaction_graph(interaction_matrix,head_items,tail_items)
-    # a_same = model(graph)
-    #
-    # a_same=a_same[tail_items]
-    # loss_G, loss_D = synthetic_representation(generator, discriminator, a_same, i_head, i_tail, optimizer_G, optimizer_D, N_D)
-    # print(f"Epoch [{epoch + 1}/{epoch}] : Loss D = {loss_D}, Loss G = {loss_G}")
-    #
-    # #Main_Loss
-    #
-    # z_i = generator(a_same, i_tail)
-    #
-    # with torch.no_grad():
-    #     new_embeddings = all_embeddings.clone()
-    #     new_embeddings[tail_items] = z_i.detach()
-    #     all_embeddings = new_embeddings
-    #
+    total_loss_tail = tail_items_self_supervised_training(
+        model, optimizer, int_edges, head_items, tail_items, H=128, tau=0.1
+    )
+
+    print(f"Epoch [{epoch + 1}/{epochs}], Loss (Tail): {total_loss_tail:.4f}")
+
+    user_embeddings = model.user_embedding.weight
+    item_embeddings = model.item_embedding.weight
+    all_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
+
+
+    # Diffusion Learning
+
+
+
+
+
+    #Main Loss
     users=torch.randperm(num_users,device=device)
     for t in range(0, num_users, T):
         batch_users = users[t:min(t+T,num_users)]
@@ -169,11 +146,11 @@ for epoch in iterator:
     if epoch%10==0 and epoch!=0:
         ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
         ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-        # ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
-        ndcg_calculation_3(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
+        ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
+        # ndcg_calculation_3(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
 
 
 ndcg_calculation_2(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
 ndcg_calculation_head(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
-# ndcg_calculation_tail(model, test_set, neg_samples, num_users,int_edges,tail_items,k=2)
-ndcg_calculation_3(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
+ndcg_calculation_tail(model, test_set, neg_samples, num_users,int_edges,tail_items,k=2)
+# ndcg_calculation_3(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)

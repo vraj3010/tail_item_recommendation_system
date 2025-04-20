@@ -4,9 +4,9 @@ from loss import *
 from torch_geometric.data import Data
 import random
 
-def add_nodes(graph, head_item, batch_items, num_additional_nodes=3):
-    device = graph.edge_index.device
-    edge_index = graph.edge_index.clone()  # Shape: [2, num_edges]
+def add_nodes(edge_index, head_item, batch_items, num_additional_nodes=3):
+    # device = graph.edge_index.device
+    # edge_index = graph.edge_index.clone()  # Shape: [2, num_edges]
     users, items = edge_index[0], edge_index[1]  # Assume edge_index = [users, items]
     new_edges = []
 
@@ -49,12 +49,12 @@ def add_nodes(graph, head_item, batch_items, num_additional_nodes=3):
     if new_edges:
         edge_index = torch.cat([edge_index, torch.cat(new_edges, dim=1)], dim=1)
 
-    return Data(edge_index=edge_index, num_nodes=graph.num_nodes).to(device)
+    return edge_index
 
-def add_edges(graph, tail_items):
+def add_edges(edge_index, tail_items):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    edge_index = graph.edge_index.clone().to(device)
-    num_nodes = graph.num_nodes
+    # edge_index = graph.edge_index.clone().to(device)
+    # num_nodes = graph.num_nodes
 
     # Initialize new_edges as an empty (2, 0) tensor
     new_edges = torch.empty((2, 0), dtype=torch.long, device=device)
@@ -90,7 +90,7 @@ def add_edges(graph, tail_items):
     # Concatenate new edges with the original graph
     edge_index = torch.cat([edge_index, new_edges], dim=1)
 
-    return Data(edge_index=edge_index, num_nodes=num_nodes).to(device)
+    return edge_index
 
 def tail_items_self_supervised_training(model, optimizer, int_edges, head_items, tail_items, H=4, tau=0.1):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -106,26 +106,10 @@ def tail_items_self_supervised_training(model, optimizer, int_edges, head_items,
     tail_items_tensor = tail_items_tensor[shuffled_indices]
 
     batch_size = len(tail_items) // H
-    base_graph = Data(edge_index=int_edges, num_nodes=max(int_edges.flatten()) + 1).to(device)
+    # base_graph = Data(edge_index=int_edges, num_nodes=max(int_edges.flatten()) + 1).to(device)
 
-    ##########
-    # monitor_edges = torch.tensor([[13,1025],[13,1095],[13,653],[13,1118]], dtype=torch.long, device=device)  # Shape: (3, 2)
-    #
-    # print("Selected interactions to monitor (node pairs):")
-    # for i, (u, v) in enumerate(monitor_edges):
-    #     print(f"Interaction {i + 1}: Node {u.item()} - Node {v.item()}")
-    #
-    # # Initial embedding product
-    # graph = Data(edge_index=int_edges, num_nodes=int_edges.max().item() + 1).to(device)
-    # with torch.no_grad():
-    #     initial_emb = model(graph)
-    #     print("\nInitial dot products between monitored interaction node pairs:")
-    #     for i, (u, v) in enumerate(monitor_edges):
-    #         dot_product = torch.dot(initial_emb[u], initial_emb[v]).item()
-    #         print(f"Interaction {i + 1} ({u.item()}, {v.item()}): {dot_product:.4f}")
-    # ##############
-    graph = add_nodes(base_graph.clone(), head_items_tensor, tail_items)
-    graph2 = add_edges(base_graph.clone(), tail_items)
+    int_edges_1 = add_nodes(int_edges, head_items_tensor, tail_items)
+    int_edges_2 = add_edges(int_edges, tail_items)
     for batch in range(H):
 
         start_idx = batch * batch_size
@@ -134,7 +118,7 @@ def tail_items_self_supervised_training(model, optimizer, int_edges, head_items,
 
         model.train()
 
-        all_emb1, all_emb2 = model(graph), model(graph2)
+        all_emb1, all_emb2 = model(int_edges_1), model(int_edges_2)
         emb1 = all_emb1[batch_items]
         emb2 = all_emb2[batch_items]
 
@@ -147,14 +131,5 @@ def tail_items_self_supervised_training(model, optimizer, int_edges, head_items,
         optimizer.zero_grad()
         loss_tail.backward()
         optimizer.step()
-
-        ####
-        # with torch.no_grad():
-        #     updated_emb = model(graph)
-        #     print(f"\nDot products after batch {batch + 1}:")
-        #     for i, (u, v) in enumerate(monitor_edges):
-        #         dot_product = torch.dot(updated_emb[u], updated_emb[v]).item()
-        #         print(f"Interaction {i + 1} ({u.item()}, {v.item()}): {dot_product:.4f}")
-        #######
 
     return total_loss_tail
