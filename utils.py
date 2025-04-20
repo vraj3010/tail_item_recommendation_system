@@ -99,6 +99,7 @@ def ndcg_calculation_2(model, test_set, neg_samples,num_users,int_edges,head_ite
         if len(neg_items)*2<k:
             continue
         test_items = [item-num_users for item in pos_items] + neg_items
+        test_items = torch.tensor(test_items, dtype=torch.long)
         user_emb = user_embeddings[user_id]
         item_embs = item_embeddings[test_items]
         scores = torch.matmul(item_embs, user_emb)
@@ -152,6 +153,7 @@ def ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, he
 
         # Convert head items to item indices (subtracting num_users)
         test_items = [item - num_users for item in head_pos_items] + neg_items
+        test_items = torch.tensor(test_items, dtype=torch.long)
         user_emb = user_embeddings[user_id]
         item_embs = item_embeddings[test_items]
         scores = torch.matmul(item_embs, user_emb)
@@ -207,6 +209,7 @@ def ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, ta
         #     print(neg_items)
         # Convert head items to item indices (subtracting num_users)
         test_items = [item - num_users for item in head_pos_items] + neg_items
+        test_items = torch.tensor(test_items, dtype=torch.long)
         user_emb = user_embeddings[user_id]
         item_embs = item_embeddings[test_items]
         scores = torch.matmul(item_embs, user_emb)
@@ -262,6 +265,7 @@ def ndcg_calculation_3(model, test_set, neg_samples,num_users,int_edges,head_ite
         # if len(neg_items)*2<k:
         #     continue
         test_items = [item-num_users for item in pos_items] + neg_items
+        test_items=torch.tensor(test_items,dtype=torch.long)
         user_emb = user_embeddings[user_id]
         item_embs = item_embeddings[test_items]
         scores = torch.matmul(item_embs, user_emb)
