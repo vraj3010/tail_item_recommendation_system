@@ -83,7 +83,8 @@ N_D = 5
 # ndcg_calculation_3(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
 ndcg_calculation_2(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
 ndcg_calculation_head(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
-ndcg_calculation_tail(model, test_set, neg_samples, num_users,int_edges,tail_items,k=2)
+# ndcg_calculation_tail(model, test_set, neg_samples, num_users,int_edges,tail_items,k=2)
+ndcg_calculation_3(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
 print("Training started")
 iterator = tqdm(range(epochs))
 for epoch in iterator:
@@ -163,12 +164,13 @@ for epoch in iterator:
         loss_main.backward()
         optimizer.step()
 
-        print(f"Batch {t // T + 1}: Loss Main = {loss_main.item()}")
+        # print(f"Batch {t // T + 1}: Loss Main = {loss_main.item()}")
 
-        if epoch%10==0 and epoch!=0:
-            ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-            ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-            ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
+    if epoch%10==0 and epoch!=0:
+        ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
+        ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
+        # ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
+        ndcg_calculation_3(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
 
 
 ndcg_calculation_2(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
