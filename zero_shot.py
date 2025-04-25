@@ -80,9 +80,10 @@ def construct_interaction_graph(interaction_matrix, head_items, tail_items):
     ], dim=0)
 
     # Construct graph
-    graph = Data(edge_index=edge_index, edge_weight=edge_weights)
-
-    return graph
+    # graph = Data(edge_index=edge_index, edge_weight=edge_weights)
+    print(edge_weights.shape)
+    print(edge_index.shape)
+    return edge_index,edge_weights
 
 
 def construct_interaction_matrix(int_edges, head_items, tail_items, num_users,num_movies):
@@ -98,5 +99,5 @@ def construct_interaction_matrix(int_edges, head_items, tail_items, num_users,nu
 
     # Compute common interactions between head and tail items
     interaction_matrix = head_matrix.T @ tail_matrix  # (num_head_items × num_tail_items)
-
+    print(interaction_matrix.shape)
     return interaction_matrix

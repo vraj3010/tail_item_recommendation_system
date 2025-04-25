@@ -10,7 +10,7 @@ class LightGCNConv(MessagePassing):
     def __init__(self):
         super().__init__(aggr='add')
 
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index,edge_weight=None):
         #row stores outgoing node and correspponding value stores incoming node in col
         row, col = edge_index
         #next line calculates the degree of each node(total incoming edges)
@@ -18,7 +18,8 @@ class LightGCNConv(MessagePassing):
         deg_inv_sqrt = deg.pow(-0.5)
         deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
         norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
-
+        if edge_weight is not None:
+            norm = norm * edge_weight  # Apply interaction weight
         out = self.propagate(edge_index, x=x, norm=norm)
         return out
 
@@ -45,13 +46,14 @@ class LightGCN(nn.Module):
         for i in range(self.num_layers):
             self.convs.append(LightGCNConv())
 
-    def forward(self, edge_index, head_items=None, mask_edges=False, mask_nodes=False):
+    def forward(self, edge_index, head_items=None, mask_edges=False, mask_nodes=False,edge_weights=None):
 
-        # Move data to device
-        # print("hii")
         edge_index = edge_index.to(self.device)
+        if edge_weights is not None:
+            edge_weights=edge_weights.to(self.device)
         emb = torch.cat([self.user_embedding.weight, self.item_embedding.weight], dim=0).to(self.device)
         emb_lst=[emb]
+
         if mask_edges and head_items is not None and self.edge_dropout > 0:
             remaining_edges = []
 
@@ -83,8 +85,10 @@ class LightGCN(nn.Module):
 
 
         edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=1)
+        if edge_weights is not None:
+            edge_weights = torch.cat([edge_weights, edge_weights], dim=0)
         for lightgcn in self.convs:
-            emb=lightgcn(emb,edge_index)
+            emb=lightgcn(emb,edge_index,edge_weights)
             emb_lst.append(emb)
         # embeddings = self.conv1(embeddings, edge_index)
         # embeddings = self.conv2(embeddings, edge_index)

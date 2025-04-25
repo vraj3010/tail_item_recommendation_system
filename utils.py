@@ -79,7 +79,7 @@ def create_test_set(test_edges):
 
 
 
-def ndcg_calculation_2(model, test_set, neg_samples,num_users,int_edges,head_items,k=5):
+def ndcg_calculation_2(model, test_set, neg_samples,num_users,int_edges,head_items,k=5,N=None):
 
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     user_embeddings=model.user_embedding.weight
@@ -93,12 +93,18 @@ def ndcg_calculation_2(model, test_set, neg_samples,num_users,int_edges,head_ite
             continue
 
         h=len(pos_items)
+        N2=N
+        # print(h,end=" ")
+        if N2==None:
+            N2=h
+        # print(N2,end=" ")
+        neg_items = random.sample(neg_samples[user_id], N2)
 
-        neg_items = random.sample(neg_samples[user_id], h)
-
-        if len(neg_items)*2<k:
-            continue
+        # print(len(pos_items),end=" ")
         test_items = [item-num_users for item in pos_items] + neg_items
+        # print(len(test_items))
+        if len(test_items)<k:
+            continue
         test_items = torch.tensor(test_items, dtype=torch.long)
         user_emb = user_embeddings[user_id]
         item_embs = item_embeddings[test_items]
@@ -123,7 +129,7 @@ def ndcg_calculation_2(model, test_set, neg_samples,num_users,int_edges,head_ite
     print(f"NDCG@10: {avg_ndcg}")
 
 
-def ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=5):
+def ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=5,N=None):
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # graph = Data(edge_index=int_edges, num_nodes=int_edges.max().item() + 1).to(device)
@@ -145,14 +151,19 @@ def ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, he
         if not head_pos_items:
             continue
 
-        h = len(head_pos_items)
-        neg_items = random.sample(neg_samples[user_id], h)
 
-        if len(neg_items) * 2 < k:
-            continue
+        h = len(head_pos_items)
+        N2=N
+        if N2 is None:
+            N2=h
+        neg_items = random.sample(neg_samples[user_id], N2)
+
+
 
         # Convert head items to item indices (subtracting num_users)
         test_items = [item - num_users for item in head_pos_items] + neg_items
+        if len(test_items)<k:
+            continue
         test_items = torch.tensor(test_items, dtype=torch.long)
         user_emb = user_embeddings[user_id]
         item_embs = item_embeddings[test_items]
@@ -179,7 +190,7 @@ def ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, he
     return avg_ndcg
 
 
-def ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=5):
+def ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=5,N=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # graph = Data(edge_index=int_edges, num_nodes=int_edges.max().item() + 1).to(device)
@@ -201,14 +212,18 @@ def ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, ta
         if not head_pos_items:
             continue
         # print(len(head_pos_items),end=" ")
-        if len(head_pos_items)*2 < k:
-            continue
+
         h = len(head_pos_items)
-        neg_items = random.sample(neg_samples[user_id], h)
+        N2=N
+        if N2 is None:
+            N2=h
+        neg_items = random.sample(neg_samples[user_id], N2)
         # if user_id==3:
         #     print(neg_items)
         # Convert head items to item indices (subtracting num_users)
         test_items = [item - num_users for item in head_pos_items] + neg_items
+        if len(test_items)<k:
+            continue
         test_items = torch.tensor(test_items, dtype=torch.long)
         user_emb = user_embeddings[user_id]
         item_embs = item_embeddings[test_items]
@@ -234,63 +249,3 @@ def ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, ta
 
     print(f"NDCG@{k} for tail items: {avg_ndcg}")
     return avg_ndcg
-
-
-def ndcg_calculation_3(model, test_set, neg_samples,num_users,int_edges,head_items,k=5):
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # graph = Data(edge_index=int_edges, num_nodes=int_edges.max().item() + 1).to(device)
-    # with torch.no_grad():
-    #     initial_emb = model(graph)
-    #     user_embeddings = initial_emb[:num_users,:]
-    #     item_embeddings = initial_emb[num_users:,:]
-
-    user_embeddings=model.user_embedding.weight
-    item_embeddings=model.item_embedding.weight
-    total_ndcg = 0
-    count = 0
-
-    for user_id, pos_items in test_set.items():
-
-        # print(len(pos_items))
-
-        if not pos_items:
-            continue
-
-        h=len(pos_items)
-        neg_items = neg_samples[user_id]
-        # # if (user_id == 0):
-        # #     print(user_id,len(neg_samples[user_id]))
-        # if len(neg_items)*2<k:
-        #     continue
-        test_items = [item-num_users for item in pos_items] + neg_items
-        test_items=torch.tensor(test_items,dtype=torch.long)
-        user_emb = user_embeddings[user_id]
-        item_embs = item_embeddings[test_items]
-        scores = torch.matmul(item_embs, user_emb)
-        sorted_indices = torch.argsort(scores, descending=True)
-        sorted_items = [test_items[i] for i in sorted_indices.tolist()]
-        dcg = 0
-        for i, item in enumerate(sorted_items[:k]):
-            # if(user_id==13):
-            #     print(item+num_users,end="* ")
-
-            if item+num_users in pos_items:
-                dcg += 1 / np.log2(i + 2)
-
-        # if (user_id == 13):
-        #     print()
-        # ideal_rels = sorted([r for _, r in pos_items], reverse=True)[:k]
-        idcg = sum(1/ np.log2(i + 2) for i in range(min(len(pos_items),k)))
-
-        ndcg = dcg / idcg if idcg > 0 else 0
-        # if(user_id<40):
-        #     print(ndcg,end="&")
-        #     print(user_id)
-        total_ndcg += ndcg
-        count += 1
-
-    avg_ndcg= total_ndcg / count if count > 0 else 0
-    print(f"NDCG@10: {avg_ndcg}")
-
