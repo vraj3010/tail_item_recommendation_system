@@ -249,3 +249,18 @@ def ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, ta
 
     print(f"NDCG@{k} for tail items: {avg_ndcg}")
     return avg_ndcg
+
+
+from torch.utils.data import Dataset
+
+class InteractionDataset(Dataset):
+    def __init__(self, int_edges):
+        self.int_edges = int_edges
+
+    def __len__(self):
+        return self.int_edges.size(1)
+
+    def __getitem__(self, index):
+        user, item = self.int_edges[:, index]
+        # Convert to float for noise addition
+        return torch.tensor([user, item], dtype=torch.float32)
