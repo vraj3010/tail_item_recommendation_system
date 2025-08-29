@@ -232,14 +232,14 @@ def ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, ta
     print(f"NDCG@{k} for tail items: {avg_ndcg}")
     return avg_ndcg
 
-
-def catalog_coverage(model, test_set, num_users, k=10):
-
-    user_embeddings = model.user_embedding.weight
-    item_embeddings = model.item_embedding.weight
+def catalog_coverage_head_tail(model, test_set, num_users, head_items, tail_items, k=10, device="cpu"):
+    user_embeddings = model.user_embedding.weight.to(device)
+    item_embeddings = model.item_embedding.weight.to(device)
     num_items = item_embeddings.shape[0]
 
     recommended_items = set()
+    recommended_head = set()
+    recommended_tail = set()
 
     for user_id in test_set.keys():
         # get user embedding
@@ -251,11 +251,20 @@ def catalog_coverage(model, test_set, num_users, k=10):
         # store recommended items
         for idx in topk_indices:
             recommended_items.add(idx)
+            if idx in head_items:
+                recommended_head.add(idx)
+            if idx in tail_items:
+                recommended_tail.add(idx)
 
-    coverage = len(recommended_items) / num_items
-    print(f"Catalog Coverage@{k}: {coverage:.4f}")
-    return coverage
+    overall_coverage = len(recommended_items) / num_items
+    head_coverage = len(recommended_head) / len(head_items) if len(head_items) > 0 else 0
+    tail_coverage = len(recommended_tail) / len(tail_items) if len(tail_items) > 0 else 0
 
+    print(f"Catalog Coverage@{k} (Overall): {overall_coverage:.4f}")
+    print(f"Catalog Coverage@{k} (Head): {head_coverage:.4f}")
+    print(f"Catalog Coverage@{k} (Tail): {tail_coverage:.4f}")
+
+    return overall_coverage, head_coverage, tail_coverage
 
 def precision_recall_at_k(model, test_set, neg_samples, num_users, head_items, k=10, N=None, device=None):
     if device is None:
