@@ -247,7 +247,7 @@ for epoch in iterator:
         ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
         ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
         ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=10, N=80)
-        catalog_coverage_head_tail(model, test_set, num_users)
+        catalog_coverage_head_tail(model, test_set, num_users, head_items, tail_items)
         precision_recall_at_k(model, test_set, neg_samples, num_users, head_items)
 
 print("finished. Final Reuslts: ")
@@ -257,5 +257,5 @@ ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_i
 ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
 ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
 ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=10, N=80)
-catalog_coverage_head_tail(model, test_set, num_users)
+catalog_coverage_head_tail(model, test_set, num_users,head_items,tail_items)
 precision_recall_at_k(model, test_set, neg_samples, num_users, head_items)
