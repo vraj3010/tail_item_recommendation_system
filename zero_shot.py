@@ -81,8 +81,8 @@ def construct_interaction_graph(interaction_matrix, head_items, tail_items):
 
     # Construct graph
     # graph = Data(edge_index=edge_index, edge_weight=edge_weights)
-    print(edge_weights.shape)
-    print(edge_index.shape)
+    # print(edge_weights.shape)
+    # print(edge_index.shape)
     return edge_index,edge_weights
 
 

@@ -34,7 +34,6 @@ interaction_counts = ratings['movieId'].value_counts().to_dict()
 
 # Separate Head and Tail Items
 head_items, tail_items = separate_head_tail_items(interaction_counts, head_threshold=15)
-print(len(head_items))
 num_users = ratings['userId'].nunique()
 num_movies = ratings['movieId'].nunique()
 print(num_users,num_movies)
@@ -68,7 +67,7 @@ model = LightGCN(num_users, num_movies, embedding_dim).to(device)  # Move model 
 
 # Optimizer
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-epochs = 1
+epochs = 1000
 K = 128 # Number of batches in head item
 H = 128  # Number of batches in tail item
 T = 124  # Number of users per batch
@@ -83,7 +82,7 @@ optimizer_G = optim.Adam(generator.parameters(), lr=learning_rate)
 optimizer_D = optim.Adam(discriminator.parameters(), lr=learning_rate)
 N_D = 5
 
-#Diffusion Recommendation
+#Diffusion Recommendation Parameters
 mean_type = gd.ModelMeanType.START_X
 lr=5e-5
 weight_decay=0
@@ -110,10 +109,16 @@ mlp_num = sum([param.nelement() for param in model2.parameters()])
 diff_num = sum([param.nelement() for param in diffusion.parameters()])  # 0
 param_num = mlp_num + diff_num
 print("Number of all parameters:", param_num)
-train_dataset = InteractionDataset(int_edges)
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 #################
 
+ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
+ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
+ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
+ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
+ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
+ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=10, N=80)
+catalog_coverage(model, test_set, num_users)
+precision_recall_at_k(model, test_set, neg_samples, num_users, head_items)
 
 print("Training started")
 interaction_matrix=construct_interaction_matrix(int_edges,head_items,tail_items,num_users,num_movies)
@@ -142,55 +147,68 @@ for epoch in iterator:
     item_embeddings = model.item_embedding.weight
     all_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
     i_tail = all_embeddings[tail_items]
-
-    # # Synthetic Representation
+    # # Tail Head Item Similarity
+    # head_emb=all_embeddings[head_items]
+    # tail_emb=all_embeddings[tail_items]
     # interaction_matrix=construct_interaction_matrix(int_edges,head_items,tail_items,num_users,num_movies)
-    # edge_index2,edge_weights2=construct_interaction_graph(interaction_matrix,head_items,tail_items)
-    # a_same = model(edge_index2,edge_weights=edge_weights2)
-    # #
-    # a_same=a_same[tail_items]
-    # loss_G, loss_D = synthetic_representation(generator, discriminator, a_same, i_head, i_tail, optimizer_G, optimizer_D, N_D)
-    # print(f"Epoch [{epoch + 1}/{epoch}] : Loss D = {loss_D}, Loss G = {loss_G}")
-    # #
-    # # #Main_Loss
-    # #
-    # z_i = generator(a_same, i_tail)
+    # model.train()
+    # loss_tail_head = tail_head_cosine_loss(head_emb, tail_emb, interaction_matrix, top_percent=0.1)
+    # optimizer.zero_grad()
+    # loss_tail_head.backward()
+    # optimizer.step()
+
+    # Synthetic Representation
+    edge_index2,edge_weights2=construct_interaction_graph(interaction_matrix,head_items,tail_items)
+    a_same = model(edge_index2,edge_weights=edge_weights2)
+    a_same=a_same[tail_items]
+    loss_G, loss_D = synthetic_representation(generator, discriminator, a_same, i_head, i_tail, optimizer_G, optimizer_D, N_D)
+    print(f"Epoch [{epoch + 1}/{epoch}] : Loss D = {loss_D}, Loss G = {loss_G}")
     #
-    # with torch.no_grad():
-    #     new_embeddings = all_embeddings.clone()
-    #     new_embeddings[tail_items] = z_i.detach()
-    #     all_embeddings = new_embeddings
+    # #Main_Loss
+    #
+    z_i = generator(a_same, i_tail)
+
+    with torch.no_grad():
+        new_embeddings = all_embeddings.clone()
+        new_embeddings[tail_items] = z_i.detach()
+        all_embeddings = new_embeddings
 
 
+    # if epoch==epochs/2:
+    #     #Diffusion Model training at half epochs
+    #     user_embeddings = model.user_embedding.weight
+    #     item_embeddings = model.item_embedding.weight
+    #     all_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
+    #     n_epoch=100
+    #     for epoched in range(n_epoch):
+    #         tot=torch.randperm(num_users+num_movies,device=device)
+    #         model2.train()
+    #         total_loss=0
+    #         for t in range(0, num_users+num_movies, batch_size):
+    #             batch = tot[t:min(t+batch_size,num_users+num_movies)]
+    #             batch_emb=all_embeddings[batch]
+    #             optimizer2.zero_grad()
+    #             losses = diffusion.training_losses(model2, batch_emb, reweight)
+    #
+    #             loss = losses["loss"].mean()
+    #             total_loss += loss
+    #             loss.backward()
+    #             optimizer2.step()
+    #         print(epoched)
+    #
+    #     prediction = diffusion.p_sample(model2, all_embeddings, sampling_steps, sampling_noise=False)
+    #     print(prediction.shape)
+    #     with torch.no_grad():
+    #         model.user_embedding.weight.copy_(prediction[:num_users])
+    #         model.item_embedding.weight.copy_(prediction[num_users:num_users + num_movies])
 
 
-    #difuusion Recommendation
-    print("hii")
-    if epoch%100==0:
-
-        n_epoch=100
-        for epoched in range(n_epoch):
-            tot=torch.randperm(num_users+num_movies,device=device)
-            model2.train()
-            total_loss=0
-            for t in range(0, num_users+num_movies, batch_size):
-                batch = tot[t:min(t+batch_size,num_users+num_movies)]
-                batch_emb=all_embeddings[batch]
-                optimizer2.zero_grad()
-                # print(batch_emb.shape)
-                losses = diffusion.training_losses(model2, batch_emb, reweight)
-
-                loss = losses["loss"].mean()
-                total_loss += loss
-                loss.backward()
-                optimizer2.step()
-            print(epoched)
-
-        prediction = diffusion.p_sample(model2, all_embeddings, sampling_steps, sampling_noise=False)
-        print(prediction.shape)
-        with torch.no_grad():
-            model.user_embedding.weight.copy_(prediction[:num_users])
-            model.item_embedding.weight.copy_(prediction[num_users:num_users + num_movies])
+    # if epoch>epochs/2:
+    #     prediction = diffusion.p_sample(model2, all_embeddings, sampling_steps, sampling_noise=False)
+    #     print(prediction.shape)
+    #     with torch.no_grad():
+    #         model.user_embedding.weight.copy_(prediction[:num_users])
+    #         model.item_embedding.weight.copy_(prediction[num_users:num_users + num_movies])
 
     #bpr loss
     users = torch.randperm(num_users, device=device)
@@ -220,20 +238,24 @@ for epoch in iterator:
         loss_main.backward()
         optimizer.step()
 
-        # print(f"Batch {t // T + 1}: Loss Main = {loss_main.item()}")
+        print(f"Batch {t // T + 1}: Loss Main = {loss_main.item()}")
 
-    # if epoch%10==0 and epoch!=0:
-    #     ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-    #     ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-    #     ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
-    #     ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
-    #     ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
-    #     ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=10, N=80)
+    if epoch%10==0 and epoch!=0:
+        ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
+        ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
+        ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
+        ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
+        ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
+        ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=10, N=80)
+        catalog_coverage(model, test_set, num_users)
+        precision_recall_at_k(model, test_set, neg_samples, num_users, head_items)
 
-
-ndcg_calculation_2(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
-ndcg_calculation_head(model, test_set, neg_samples, num_users,int_edges,head_items,k=10)
-ndcg_calculation_tail(model, test_set, neg_samples, num_users,int_edges,tail_items,k=2)
-ndcg_calculation_2(model, test_set, neg_samples, num_users,int_edges,head_items,k=10,N=80)
-ndcg_calculation_head(model, test_set, neg_samples, num_users,int_edges,head_items,k=10,N=80)
-ndcg_calculation_tail(model, test_set, neg_samples, num_users,int_edges,tail_items,k=10,N=80)
+print("finished. Final Reuslts: ")
+ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
+ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
+ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
+ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
+ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
+ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=10, N=80)
+catalog_coverage(model, test_set, num_users)
+precision_recall_at_k(model, test_set, neg_samples, num_users, head_items)
