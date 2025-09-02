@@ -79,7 +79,7 @@ def create_test_set(test_edges):
 
 
 
-def ndcg_calculation_2(model, test_set, neg_samples,num_users,int_edges,head_items,k=5,N=None):
+def ndcg_calculation_2(model, test_set, neg_samples,num_users,head_items,k=5,N=None):
 
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     user_embeddings=model.user_embedding.weight
@@ -126,7 +126,7 @@ def ndcg_calculation_2(model, test_set, neg_samples,num_users,int_edges,head_ite
     print(f"NDCG@10: {avg_ndcg}")
 
 
-def ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=5,N=None):
+def ndcg_calculation_head(model, test_set, neg_samples, num_users, head_items, k=5,N=None):
 
     user_embeddings=model.user_embedding.weight
     item_embeddings=model.item_embedding.weight
@@ -180,7 +180,7 @@ def ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, he
     return avg_ndcg
 
 
-def ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=5,N=None):
+def ndcg_calculation_tail(model, test_set, neg_samples, num_users, tail_items, k=5,N=None):
 
     user_embeddings=model.user_embedding.weight
     item_embeddings=model.item_embedding.weight
@@ -232,7 +232,7 @@ def ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, ta
     print(f"NDCG@{k} for tail items: {avg_ndcg}")
     return avg_ndcg
 
-def catalog_coverage_head_tail(model, test_set, num_users, head_items, tail_items, k=10, device="cpu"):
+def catalog_coverage_head_tail(model, test_set, num_users,neg_samples, head_items, tail_items, k=10, device="cpu"):
     user_embeddings = model.user_embedding.weight.to(device)
     item_embeddings = model.item_embedding.weight.to(device)
     num_items = item_embeddings.shape[0]
@@ -241,11 +241,13 @@ def catalog_coverage_head_tail(model, test_set, num_users, head_items, tail_item
     recommended_head = set()
     recommended_tail = set()
 
-    for user_id in test_set.keys():
+    for user_id in range(num_users):
         # get user embedding
         user_emb = user_embeddings[user_id]
         # compute scores for all items
-        scores = torch.matmul(item_embeddings, user_emb)
+        neg_items=torch.tensor(neg_samples[user_id],dtype=torch.long,device=device)
+        item_emb=item_embeddings[neg_items]
+        scores = torch.matmul(item_emb, user_emb)
         # get top-k items
         topk_indices = torch.topk(scores, k).indices.tolist()
         # store recommended items

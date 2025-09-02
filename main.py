@@ -1,19 +1,17 @@
 import pandas as pd
 import torch.optim as optim
-import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from train_test import train_test_split_per_user
-import torch
 from DNN import DNN
 from head_gcn import head_items_self_supervised_training
 from tail_gcn import *
 from utils import *
 from model import LightGCN
 from zero_shot import *
-from torch_geometric.data import Data
 import gaussian_diffusion as gd
 from tqdm import tqdm
-from torch.utils.data import DataLoader
+import argparse
+
 ###
 torch.set_printoptions(sci_mode=False)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -41,7 +39,6 @@ head_items = torch.tensor([i + num_users for i in head_items], dtype=torch.long,
 tail_items = torch.tensor([i + num_users for i in tail_items], dtype=torch.long, device=device)
 
 int_edges = create_interaction_edges(ratings['userId'], ratings['movieId'], ratings['rating']).to(device)
-# int_edges[1] += num_users
 
 user_ids = int_edges[0].to(dtype=torch.long, device=device)
 indices = torch.arange(0, int_edges.shape[1], dtype=torch.long, device=device)
@@ -49,11 +46,8 @@ indices = torch.arange(0, int_edges.shape[1], dtype=torch.long, device=device)
 # Train-Test Split (Per User)
 train_idx, test_idx = train_test_split_per_user(indices, user_ids, test_size=0.2)
 
-####
 train_edges = int_edges[:, train_idx]
 train_adj = create_adj_matrix(train_edges, num_users, num_movies)
-# train_r = adj_to_r_mat(train_adj, num_users, num_movies)
-####
 
 int_edges[1] += num_users
 test_edges = int_edges[:, test_idx]  # Select test edges
@@ -64,10 +58,9 @@ test_set=create_test_set(test_edges)
 embedding_dim = 64  # Choose the embedding dimension
 model = LightGCN(num_users, num_movies, embedding_dim).to(device)  # Move model to GPU
 
-
 # Optimizer
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-epochs = 1000
+epochs = 100
 K = 128 # Number of batches in head item
 H = 128  # Number of batches in tail item
 T = 124  # Number of users per batch
@@ -102,7 +95,6 @@ diffusion = gd.GaussianDiffusion(mean_type, noise_schedule, \
 out_dims = [64,64]   #64,64
 in_dims = out_dims[::-1]  #9724,500
 model2 = DNN(in_dims, out_dims, emb_size, time_type="cat", norm=False).to(device)
-
 optimizer2 = optim.AdamW(model2.parameters(), lr=lr, weight_decay=weight_decay)
 print("models ready.")
 mlp_num = sum([param.nelement() for param in model2.parameters()])
@@ -111,13 +103,43 @@ param_num = mlp_num + diff_num
 print("Number of all parameters:", param_num)
 #################
 
-ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
-ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
-ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
-ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=10, N=80)
-catalog_coverage_head_tail(model, test_set, num_users,head_items,tail_items)
+###################  for particular epochs
+end_epoch=99
+parser = argparse.ArgumentParser()
+parser.add_argument("--checkpoint_path", type=str, default="checkpointpath_last.pth",
+                    help="Path to save/load checkpoint")
+args = parser.parse_args()
+
+checkpoint_path = args.checkpoint_path
+
+try:
+    checkpoint = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+    generator.load_state_dict(checkpoint["generator_state_dict"])
+    discriminator.load_state_dict(checkpoint["discriminator_state_dict"])
+    optimizer_G.load_state_dict(checkpoint["optimizer_G_state_dict"])
+    optimizer_D.load_state_dict(checkpoint["optimizer_D_state_dict"])
+
+
+    end_epoch=checkpoint['epoch']+100
+    int_edges=checkpoint['int_edges']
+    test_set=checkpoint['test_set']
+    print(f"Resumed from saved model")
+except FileNotFoundError:
+    print("⚡ No checkpoint found, starting from scratch")
+
+print("total epochs run after this are:",end_epoch)
+###################
+
+ndcg_calculation_2(model, test_set, neg_samples, num_users, head_items, k=10)
+ndcg_calculation_head(model, test_set, neg_samples, num_users, head_items, k=10)
+ndcg_calculation_tail(model, test_set, neg_samples, num_users, tail_items, k=2)
+ndcg_calculation_2(model, test_set, neg_samples, num_users, head_items, k=10, N=80)
+ndcg_calculation_head(model, test_set, neg_samples, num_users, head_items, k=10, N=80)
+ndcg_calculation_tail(model, test_set, neg_samples, num_users, tail_items, k=10, N=80)
+catalog_coverage_head_tail(model, test_set, num_users,neg_samples,head_items,tail_items)
 precision_recall_at_k(model, test_set, neg_samples, num_users, head_items)
 
 print("Training started")
@@ -241,21 +263,33 @@ for epoch in iterator:
         print(f"Batch {t // T + 1}: Loss Main = {loss_main.item()}")
 
     if epoch%10==0 and epoch!=0:
-        ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-        ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-        ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
-        ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
-        ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
-        ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=10, N=80)
-        catalog_coverage_head_tail(model, test_set, num_users, head_items, tail_items)
+        ndcg_calculation_2(model, test_set, neg_samples, num_users, head_items, k=10)
+        ndcg_calculation_head(model, test_set, neg_samples, num_users, head_items, k=10)
+        ndcg_calculation_tail(model, test_set, neg_samples, num_users, tail_items, k=2)
+        ndcg_calculation_2(model, test_set, neg_samples, num_users, head_items, k=10, N=80)
+        ndcg_calculation_head(model, test_set, neg_samples, num_users, head_items, k=10, N=80)
+        ndcg_calculation_tail(model, test_set, neg_samples, num_users, tail_items, k=10, N=80)
+        catalog_coverage_head_tail(model, test_set, num_users,neg_samples, head_items, tail_items)
         precision_recall_at_k(model, test_set, neg_samples, num_users, head_items)
 
 print("finished. Final Reuslts: ")
-ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10)
-ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=2)
-ndcg_calculation_2(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
-ndcg_calculation_head(model, test_set, neg_samples, num_users, int_edges, head_items, k=10, N=80)
-ndcg_calculation_tail(model, test_set, neg_samples, num_users, int_edges, tail_items, k=10, N=80)
-catalog_coverage_head_tail(model, test_set, num_users,head_items,tail_items)
+ndcg_calculation_2(model, test_set, neg_samples, num_users, head_items, k=10)
+ndcg_calculation_head(model, test_set, neg_samples, num_users, head_items, k=10)
+ndcg_calculation_tail(model, test_set, neg_samples, num_users, tail_items, k=2)
+ndcg_calculation_2(model, test_set, neg_samples, num_users, head_items, k=10, N=80)
+ndcg_calculation_head(model, test_set, neg_samples, num_users, head_items, k=10, N=80)
+ndcg_calculation_tail(model, test_set, neg_samples, num_users, tail_items, k=10, N=80)
+catalog_coverage_head_tail(model, test_set, num_users,neg_samples,head_items,tail_items)
 precision_recall_at_k(model, test_set, neg_samples, num_users, head_items)
+
+torch.save({
+    "epoch": end_epoch,
+    "model_state_dict": model.state_dict(),
+    "optimizer_state_dict": optimizer.state_dict(),
+    "int_edges": int_edges,
+    "test_set": test_set,
+    "generator_state_dict": generator.state_dict(),
+    "discriminator_state_dict": discriminator.state_dict(),
+    "optimizer_G_state_dict": optimizer_G.state_dict(),
+    "optimizer_D_state_dict": optimizer_D.state_dict(),
+}, checkpoint_path)
