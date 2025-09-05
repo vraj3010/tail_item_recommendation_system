@@ -61,7 +61,7 @@ model = LightGCN(num_users, num_movies, embedding_dim).to(device)  # Move model 
 # Optimizer
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 epochs = 100
-K = 128 # Number of batches in head item
+K = 32 # Number of batches in head item
 H = 128  # Number of batches in tail item
 T = 124  # Number of users per batch
 input_dim = 64

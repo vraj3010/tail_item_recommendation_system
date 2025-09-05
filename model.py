@@ -27,7 +27,7 @@ class LightGCNConv(MessagePassing):
         return norm.view(-1, 1) * x_j
 
 class LightGCN(nn.Module):
-    def __init__(self, num_users, num_items, embedding_dim, edge_dropout=0.2, node_dropout=0.1, device=None,layer=3):
+    def __init__(self, num_users, num_items, embedding_dim, edge_dropout=0.3, node_dropout=0.2, device=None,layer=3):
 
         super(LightGCN, self).__init__()
         self.device = device if device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
